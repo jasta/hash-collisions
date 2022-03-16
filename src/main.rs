@@ -9,6 +9,7 @@ mod digest_producer;
 mod crc;
 mod crypto;
 mod collision_finder;
+mod hasher;
 
 #[derive(Debug, Parser)]
 #[clap(version)]
@@ -18,7 +19,7 @@ struct Opts {
   #[clap(short, long, arg_enum)]
   algorithms: Vec<Algorithm>,
 
-  #[clap(short, long, arg_enum, default_value_t = Format::SUMMARY)]
+  #[clap(short, long, arg_enum, default_value_t = Format::Summary)]
   format: Format,
 
   #[clap(short, long)]
@@ -27,19 +28,22 @@ struct Opts {
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone, ArgEnum)]
 pub enum Algorithm {
-  CRC16,
-  CRC32,
-  CRC64,
-  MD5,
-  SHA1,
-  SHA2,
+  StdDefault,
+  Metro64,
+  Spooky64,
+  Crc16,
+  Crc32,
+  Crc64,
+  Md5,
+  Sha1,
+  Sha2,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, ArgEnum)]
 pub enum Format {
-  SUMMARY,
-  WORDS,
-  BOTH,
+  Summary,
+  Words,
+  Both,
 }
 
 fn main() {
@@ -62,7 +66,7 @@ fn main() {
     resolve_algorithms(opts.algorithms),
     tx);
 
-  if opts.format == Format::SUMMARY || opts.format == Format::BOTH {
+  if opts.format == Format::Summary || opts.format == Format::Both {
     println!("Collisions by algorithm:");
     for (k, v) in &results.num_by_algorithm {
       println!(
@@ -72,7 +76,7 @@ fn main() {
     }
   }
 
-  if opts.format == Format::WORDS || opts.format == Format::BOTH {
+  if opts.format == Format::Words || opts.format == Format::Both {
     println!("All collisions");
     for collision in results.all_collisions {
       println!("{collision:?}");
@@ -83,9 +87,12 @@ fn main() {
 fn resolve_algorithms(opt_algorithms: Vec<Algorithm>) -> Vec<DigestProducerHolder> {
   let resolved_choices = if opt_algorithms.is_empty() {
     vec![
-      Algorithm::CRC32,
-      Algorithm::CRC64,
-      Algorithm::MD5,
+      Algorithm::StdDefault,
+      Algorithm::Metro64,
+      Algorithm::Spooky64,
+      Algorithm::Crc32,
+      Algorithm::Crc64,
+      Algorithm::Md5,
     ]
   } else {
     opt_algorithms
