@@ -11,7 +11,7 @@ use rayon::prelude::*;
 pub struct CollisionFinder {
   dictionary: PathBuf,
   digest_producers: Vec<DigestProducerHolder>,
-  progress_tx: Sender<Collision>,
+  progress_tx: Option<Sender<Collision>>,
   output: Option<CollisionReport>,
 }
 
@@ -19,7 +19,7 @@ impl CollisionFinder {
   pub fn find_collisions<P: AsRef<Path>>(
     dictionary: P,
     digest_producers: Vec<DigestProducerHolder>,
-    progress_tx: Sender<Collision>,
+    progress_tx: Option<Sender<Collision>>,
   ) -> CollisionReport {
     let mut finder = CollisionFinder {
       dictionary: dictionary.as_ref().to_owned(),
@@ -132,11 +132,13 @@ impl CollisionFinder {
       if v1.words.len() > old_len && v1.words.len() >= 2 {
         // Doesn't matter if this fails, the return value from the function will
         // provide the complete answer.
-        let _ = self.progress_tx.send(Collision {
-          words: v1.words.clone(),
-          algorithm: k2.algorithm,
-          hash: k2.hash.clone(),
-        });
+        if let Some(progress_tx) = &self.progress_tx {
+          let _ = progress_tx.send(Collision {
+            words: v1.words.clone(),
+            algorithm: k2.algorithm,
+            hash: k2.hash.clone(),
+          });
+        }
       }
       acc
     })

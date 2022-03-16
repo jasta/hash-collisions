@@ -17,6 +17,12 @@ struct Opts {
 
   #[clap(short, long, arg_enum)]
   algorithms: Vec<Algorithm>,
+
+  #[clap(short, long, arg_enum, default_value_t = Format::SUMMARY)]
+  format: Format,
+
+  #[clap(short, long)]
+  progress: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone, ArgEnum)]
@@ -29,32 +35,48 @@ pub enum Algorithm {
   SHA2,
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, ArgEnum)]
+pub enum Format {
+  SUMMARY,
+  WORDS,
+  BOTH,
+}
+
 fn main() {
   let opts = Opts::parse();
 
-  let (tx, rx) = crossbeam_channel::unbounded();
-  thread::spawn(move || {
-    while let Ok(collision) = rx.recv() {
-      eprintln!("Interim result: {collision:?}");
-    }
-  });
+  let tx = if opts.progress {
+    let (tx, rx) = crossbeam_channel::unbounded();
+    thread::spawn(move || {
+      while let Ok(collision) = rx.recv() {
+        eprintln!("Interim result: {collision:?}");
+      }
+    });
+    Some(tx)
+  } else {
+    None
+  };
 
   let results = CollisionFinder::find_collisions(
     Path::new(&opts.dictionary),
     resolve_algorithms(opts.algorithms),
     tx);
 
-  println!("Collisions by algorithm:");
-  for (k, v) in &results.num_by_algorithm {
-    println!(
-      "  {k:?}: {} total collided hashes, {} words",
-      v.total_collided_hashes,
-      v.total_collided_words);
+  if opts.format == Format::SUMMARY || opts.format == Format::BOTH {
+    println!("Collisions by algorithm:");
+    for (k, v) in &results.num_by_algorithm {
+      println!(
+        "  {k:?}: {} total collided hashes, {} words",
+        v.total_collided_hashes,
+        v.total_collided_words);
+    }
   }
 
-  println!("All collisions");
-  for collision in results.all_collisions {
-    println!("{collision:?}");
+  if opts.format == Format::WORDS || opts.format == Format::BOTH {
+    println!("All collisions");
+    for collision in results.all_collisions {
+      println!("{collision:?}");
+    }
   }
 }
 
