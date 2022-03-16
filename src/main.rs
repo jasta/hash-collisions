@@ -68,11 +68,12 @@ fn main() {
 
   if opts.format == Format::Summary || opts.format == Format::Both {
     println!("Collisions by algorithm:");
-    for (k, v) in &results.num_by_algorithm {
+    for report in &results.algorithms {
       println!(
-        "  {k:?}: {} total collided hashes, {} words",
-        v.total_collided_hashes,
-        v.total_collided_words);
+        "  {:<10}: {} total collided hashes, {} words",
+        format!("{:?}", report.algorithm),
+        report.total_collided_hashes,
+        report.total_collided_words);
     }
   }
 

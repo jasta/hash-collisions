@@ -34,17 +34,18 @@ impl CollisionFinder {
   fn do_start(&mut self) {
     let file = fs::File::open(&self.dictionary).unwrap();
     let by_hash = self.multiple_occurrences_by_hash(file);
-    let num_by_algorithm = Self::group_by_algorithm(&by_hash);
+    let uniques_by_algorithm = Self::group_by_algorithm(&by_hash);
+    let algorithms = self.prepare_algorithm_reports(uniques_by_algorithm);
     let mut all_collisions = Self::convert_to_collisions(by_hash);
     all_collisions.sort_unstable_by_key(|c| c.words.len());
 
     self.output = Some(CollisionReport {
-      num_by_algorithm,
+      algorithms,
       all_collisions,
     });
   }
 
-  fn group_by_algorithm(by_hash: &OccurrencesItem) -> HashMap<Algorithm, NumCollisions> {
+  fn group_by_algorithm(by_hash: &OccurrencesItem) -> ByAlgorithmItem {
     let words_by_algorithm: ByAlgorithmItem = by_hash.par_iter()
         // Map to { algorithm -> unique words, hash }
         .map(|(k, v)| {
@@ -63,14 +64,30 @@ impl CollisionFinder {
             acc
           })
         });
-    words_by_algorithm.into_iter()
+    words_by_algorithm
+  }
+
+  fn prepare_algorithm_reports(&self, mut uniques_by_algorithm: ByAlgorithmItem) -> Vec<AlgorithmReport> {
+    // Make sure there's an entry (with zeroes) for the hash algorithms that had no collisions.
+    for digest_producer in &self.digest_producers {
+      uniques_by_algorithm.entry(digest_producer.algorithm).or_default();
+    }
+
+    let mut reports: Vec<_> = uniques_by_algorithm.iter()
         .map(|(k, v)| {
-          (k, NumCollisions {
+          AlgorithmReport {
+            algorithm: *k,
             total_collided_hashes: v.hashes.len(),
             total_collided_words: v.words.len(),
-          })
+          }
         })
-        .collect()
+        .collect();
+
+    reports.sort_unstable_by_key(|report| {
+      (report.total_collided_hashes, report.algorithm)
+    });
+    reports.reverse();
+    reports
   }
 
   fn convert_to_collisions(by_hash: OccurrencesItem) -> Vec<Collision> {
@@ -177,12 +194,13 @@ pub struct Collision {
 
 #[derive(Debug, Clone)]
 pub struct CollisionReport {
-  pub num_by_algorithm: HashMap<Algorithm, NumCollisions>,
+  pub algorithms: Vec<AlgorithmReport>,
   pub all_collisions: Vec<Collision>,
 }
 
 #[derive(Debug, Clone)]
-pub struct NumCollisions {
+pub struct AlgorithmReport {
+  pub algorithm: Algorithm,
   pub total_collided_hashes: usize,
   pub total_collided_words: usize,
 }
