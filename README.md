@@ -9,4 +9,9 @@ Collisions by algorithm:
   Crc32: 1373 total collided hashes, 2746 words
 ```
 
+My test input was some random brute force password database I found online, but
+you can also test with /usr/share/dict/words which I used in the early days to
+make sure it all worked.  CRC32 also collided a few times with that much
+smaller database as well.
+
 Food for thought I suppose :)
